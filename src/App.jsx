@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import NavBar from './components/layout/NavBar';
 import Sidebar from './components/layout/Sidebar';
 import PageContainer from './components/layout/PageContainer';
+import ErrorBoundary from './components/ErrorBoundary';
 import Dashboard from './pages/Dashboard';
 import Tasks from './pages/Tasks';
 import Documents from './pages/Documents';
@@ -12,6 +13,13 @@ import Settings from './pages/Settings';
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  
+  // TODO: Replace with actual auth context in production
+  // For now, using mock user data
+  const currentUser = {
+    name: 'Project Manager',
+    email: 'admin@example.com'
+  };
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -41,20 +49,23 @@ function App() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <Sidebar 
-        currentPage={currentPage} 
-        onPageChange={handlePageChange} 
-        isOpen={sidebarOpen} 
-        onToggle={toggleSidebar}
-      />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <NavBar onToggleSidebar={toggleSidebar} />
-        <PageContainer>
-          {renderPage()}
-        </PageContainer>
+    <ErrorBoundary>
+      <div className="flex h-screen bg-gray-50 overflow-hidden">
+        <Sidebar 
+          currentPage={currentPage} 
+          onPageChange={handlePageChange} 
+          isOpen={sidebarOpen} 
+          onToggle={toggleSidebar}
+          user={currentUser}
+        />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <NavBar onToggleSidebar={toggleSidebar} />
+          <PageContainer>
+            {renderPage()}
+          </PageContainer>
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }
 

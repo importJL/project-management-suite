@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const Sidebar = ({ currentPage, onPageChange, isOpen, onToggle }) => {
+const Sidebar = ({ currentPage, onPageChange, isOpen, onToggle, user = { name: 'Guest', email: 'guest@example.com' } }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   
   const navItems = [
@@ -62,8 +62,8 @@ const Sidebar = ({ currentPage, onPageChange, isOpen, onToggle }) => {
             </div>
             {!isCollapsed && (
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-700">Project Manager</p>
-                <p className="text-xs text-gray-500">admin@example.com</p>
+                <p className="text-sm font-medium text-gray-700">{user.name}</p>
+                <p className="text-xs text-gray-500">{user.email}</p>
               </div>
             )}
           </div>
