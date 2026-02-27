@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Chart, registerables } from 'chart.js';
+Chart.register(...registerables);
 
 const Analytics = () => {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'tasks', 'resources', 'expenses'

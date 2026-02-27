@@ -5,6 +5,32 @@ const Tasks = () => {
   const [activeView, setActiveView] = useState('kanban'); // 'kanban', 'gantt', 'list'
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [currentTask, setCurrentTask] = useState(null);
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    assignee: '',
+    priority: 'medium',
+    dueDate: '',
+    tags: []
+  });
+  const [newTag, setNewTag] = useState('');
+  const [draggedTask, setDraggedTask] = useState(null);
+  const [dragOverColumn, setDragOverColumn] = useState(null);
+
+  useEffect(() => {
+    // Initialize formData when opening the form
+    if (showTaskForm) {
+      setFormData(currentTask || {
+        title: '',
+        description: '',
+        assignee: '',
+        priority: 'medium',
+        dueDate: '',
+        tags: []
+      });
+      setNewTag('');
+    }
+  }, [showTaskForm, currentTask]);
 
   useEffect(() => {
     // Mock data for tasks
@@ -170,10 +196,40 @@ const Tasks = () => {
       { id: 'blocked', title: 'Blocked', tasks: tasks.filter(task => task.status === 'blocked') }
     ];
 
+    const handleDragStart = (e, task) => {
+      setDraggedTask(task);
+      e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragOver = (e, columnId) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      setDragOverColumn(columnId);
+    };
+
+    const handleDragLeave = () => {
+      setDragOverColumn(null);
+    };
+
+    const handleDrop = (e, newStatus) => {
+      e.preventDefault();
+      if (draggedTask && draggedTask.status !== newStatus) {
+        handleTaskStatusChange(draggedTask.id, newStatus);
+      }
+      setDraggedTask(null);
+      setDragOverColumn(null);
+    };
+
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {columns.map(column => (
-          <div key={column.id} className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div 
+            key={column.id} 
+            className={`bg-white rounded-lg shadow-sm border-2 transition-all ${dragOverColumn === column.id ? 'border-blue-400 bg-blue-50' : 'border-gray-200'}`}
+            onDragOver={(e) => handleDragOver(e, column.id)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, column.id)}
+          >
             <div className="p-4 border-b border-gray-200">
               <h3 className="font-medium text-gray-900">{column.title}</h3>
               <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
@@ -184,8 +240,10 @@ const Tasks = () => {
               {column.tasks.map(task => (
                 <div 
                   key={task.id} 
-                  className="bg-white p-3 rounded-md border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  className={`bg-white p-3 rounded-md border shadow-sm hover:shadow-md transition-shadow cursor-pointer ${draggedTask?.id === task.id ? 'opacity-50' : 'border-gray-200'}`}
                   onClick={() => openTaskForm(task)}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, task)}
                 >
                   <div className="flex justify-between items-start">
                     <h4 className="font-medium text-gray-900 text-sm">{task.title}</h4>
@@ -413,18 +471,6 @@ const Tasks = () => {
 
   const renderTaskForm = () => {
     if (!showTaskForm) return null;
-
-    const initialFormData = currentTask || {
-      title: '',
-      description: '',
-      assignee: '',
-      priority: 'medium',
-      dueDate: '',
-      tags: []
-    };
-
-    const [formData, setFormData] = useState(initialFormData);
-    const [newTag, setNewTag] = useState('');
 
     const handleSubmit = (e) => {
       e.preventDefault();
