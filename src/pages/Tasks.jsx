@@ -10,6 +10,7 @@ const Tasks = () => {
     description: '',
     assignee: '',
     priority: 'medium',
+    startDate: '',
     dueDate: '',
     tags: []
   });
@@ -25,6 +26,7 @@ const Tasks = () => {
         description: '',
         assignee: '',
         priority: 'medium',
+        startDate: '',
         dueDate: '',
         tags: []
       });
@@ -286,34 +288,53 @@ const Tasks = () => {
   };
 
   const renderGanttView = () => {
-    // Simplified Gantt chart representation
-    const today = new Date();
-    const startDate = new Date(today);
-    startDate.setDate(today.getDate() - 30);
-    const endDate = new Date(today);
-    endDate.setDate(today.getDate() + 60);
-
-    // Calculate days between start and end dates
-    const daysBetween = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+    // Calculate the project timeline based on all tasks
+    const tasksWithDates = tasks.filter(t => t.startDate && t.dueDate);
     
-    // Generate date labels for the Gantt chart
+    if (tasksWithDates.length === 0) {
+      return (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+          <p className="text-gray-500">No tasks with start and due dates to display in Gantt chart.</p>
+          <p className="text-sm text-gray-400 mt-2">Add start dates to your tasks to see them in the Gantt view.</p>
+        </div>
+      );
+    }
+
+    // Find the earliest start date and latest due date
+    let minStartDate = new Date(Math.min(...tasksWithDates.map(t => new Date(t.startDate).getTime())));
+    let maxEndDate = new Date(Math.max(...tasksWithDates.map(t => new Date(t.dueDate).getTime())));
+    
+    // Add padding to the timeline
+    minStartDate.setDate(minStartDate.getDate() - 7);
+    maxEndDate.setDate(maxEndDate.getDate() + 14);
+
+    const totalDays = Math.ceil((maxEndDate - minStartDate) / (1000 * 60 * 60 * 24));
+    
+    // Generate date labels for the Gantt chart header (one per day)
     const dateLabels = [];
-    for (let i = 0; i <= daysBetween; i += 7) {
-      const date = new Date(startDate);
-      date.setDate(startDate.getDate() + i);
-      dateLabels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+    for (let i = 0; i <= totalDays; i++) {
+      const date = new Date(minStartDate);
+      date.setDate(minStartDate.getDate() + i);
+      dateLabels.push({
+        date,
+        label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        isWeekend: date.getDay() === 0 || date.getDay() === 6
+      });
     }
 
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
-        <div className="min-w-[1200px]">
+        <div className="min-w-max">
           {/* Gantt chart header */}
-          <div className="flex border-b border-gray-200">
-            <div className="w-64 p-4 border-r border-gray-200 font-medium text-gray-900">Tasks</div>
-            <div className="flex-1 flex">
-              {dateLabels.map((label, index) => (
-                <div key={index} className="flex-1 p-4 text-center text-sm text-gray-500 border-r border-gray-200">
-                  {label}
+          <div className="flex border-b border-gray-200 sticky top-0 bg-white z-10">
+            <div className="w-64 p-3 border-r border-gray-200 font-medium text-gray-900 flex-shrink-0">Tasks</div>
+            <div className="flex">
+              {dateLabels.map((item, index) => (
+                <div 
+                  key={index} 
+                  className={`w-10 p-3 text-center text-xs text-gray-500 border-r border-gray-200 flex-shrink-0 ${item.isWeekend ? 'bg-gray-50' : ''}`}
+                >
+                  {item.label}
                 </div>
               ))}
             </div>
@@ -321,46 +342,60 @@ const Tasks = () => {
           
           {/* Gantt chart tasks */}
           <div className="divide-y divide-gray-200">
-            {tasks.map(task => {
+            {tasksWithDates.map(task => {
               // Calculate task position and width
               const taskStart = new Date(task.startDate);
               const taskEnd = new Date(task.dueDate);
-              const taskStartDays = Math.ceil((taskStart - startDate) / (1000 * 60 * 60 * 24));
-              const taskDurationDays = Math.ceil((taskEnd - taskStart) / (1000 * 60 * 60 * 24));
+              const taskStartDays = Math.ceil((taskStart - minStartDate) / (1000 * 60 * 60 * 24));
+              const taskDurationDays = Math.ceil((taskEnd - taskStart) / (1000 * 60 * 60 * 24)) + 1; // Include end date
               
-              // Ensure task is within viewable range
               const startPosition = Math.max(0, taskStartDays);
-              const width = Math.min(taskDurationDays, daysBetween - startPosition);
+              const width = Math.max(1, taskDurationDays); // Minimum width of 1 day
               
               return (
                 <div key={task.id} className="flex items-center hover:bg-gray-50">
-                  <div className="w-64 p-4 border-r border-gray-200">
+                  <div className="w-64 p-3 border-r border-gray-200 flex-shrink-0">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-medium text-gray-900 text-sm">{task.title}</h4>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getPriorityColor(task.priority)}`}>
+                      <h4 className="font-medium text-gray-900 text-sm truncate">{task.title}</h4>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getPriorityColor(task.priority)} ml-2`}>
                         {task.priority}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">{task.assignee}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {new Date(task.startDate).toLocaleDateString()} - {new Date(task.dueDate).toLocaleDateString()}
+                    </p>
                   </div>
-                  <div className="flex-1 relative h-12">
+                  <div className="flex-1 relative h-14">
+                    {/* Background grid lines */}
+                    <div className="absolute inset-0 flex">
+                      {dateLabels.map((item, index) => (
+                        <div 
+                          key={index} 
+                          className={`w-10 flex-shrink-0 border-r border-gray-100 ${item.isWeekend ? 'bg-gray-50' : ''}`}
+                        />
+                      ))}
+                    </div>
+                    {/* Task bar */}
                     <div 
-                      className={`absolute top-2 h-8 rounded-md border border-gray-300 cursor-pointer transition-all hover:shadow-md ${
-                        task.status === 'completed' ? 'bg-green-100' : 
-                        task.status === 'in-progress' ? 'bg-blue-100' : 'bg-yellow-100'
+                      className={`absolute top-2 h-10 rounded-md border cursor-pointer transition-all hover:shadow-md z-10 ${
+                        task.status === 'completed' ? 'bg-green-100 border-green-300' : 
+                        task.status === 'in-progress' ? 'bg-blue-100 border-blue-300' : 
+                        task.status === 'blocked' ? 'bg-red-100 border-red-300' : 'bg-yellow-100 border-yellow-300'
                       }`}
                       style={{ 
-                        left: `${(startPosition / daysBetween) * 100}%`, 
-                        width: `${(width / daysBetween) * 100}%` 
+                        left: `${startPosition * 40}px`, 
+                        width: `${width * 40}px` 
                       }}
                       onClick={() => openTaskForm(task)}
+                      title={`${task.title}: ${task.progress}% complete`}
                     >
-                      <div className="h-full w-full flex items-center justify-between px-2">
+                      <div className="h-full w-full flex items-center justify-between px-2 overflow-hidden">
                         <span className="text-xs font-medium text-gray-900 truncate">{task.title}</span>
-                        <span className="text-xs text-gray-500">{task.progress}%</span>
+                        <span className="text-xs text-gray-600 ml-1 whitespace-nowrap">{task.progress}%</span>
                       </div>
                       {/* Progress bar */}
-                      <div className="absolute bottom-0 left-0 h-0.5 bg-blue-500" style={{ width: `${task.progress}%` }}></div>
+                      <div className="absolute bottom-0 left-0 h-1 bg-blue-500" style={{ width: `${task.progress}%` }}></div>
                     </div>
                   </div>
                 </div>
@@ -572,18 +607,34 @@ const Tasks = () => {
                   </div>
                 </div>
                 
-                <div>
-                  <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700">
-                    Due Date
-                  </label>
-                  <input
-                    type="date"
-                    id="dueDate"
-                    value={formData.dueDate}
-                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                    required
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      id="startDate"
+                      value={formData.startDate || ''}
+                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700">
+                      Due Date
+                    </label>
+                    <input
+                      type="date"
+                      id="dueDate"
+                      value={formData.dueDate}
+                      onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                      required
+                    />
+                  </div>
                 </div>
                 
                 <div>
