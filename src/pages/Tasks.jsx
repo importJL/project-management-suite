@@ -17,6 +17,19 @@ const Tasks = () => {
   const [newTag, setNewTag] = useState('');
   const [draggedTask, setDraggedTask] = useState(null);
   const [dragOverColumn, setDragOverColumn] = useState(null);
+  
+  // Filter state
+  const [filters, setFilters] = useState({
+    assignee: '',
+    priority: '',
+    tags: '',
+    startDate: '',
+    endDate: '',
+    status: ''
+  });
+  
+  // Sort state for List view
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   useEffect(() => {
     // Initialize formData when opening the form
@@ -190,12 +203,64 @@ const Tasks = () => {
     }
   };
 
+  // Get unique values for filters
+  const getUniqueAssignees = () => [...new Set(tasks.map(t => t.assignee).filter(Boolean))];
+  const getUniquePriorities = () => [...new Set(tasks.map(t => t.priority).filter(Boolean))];
+  const getUniqueTags = () => [...new Set(tasks.flatMap(t => t.tags || []))];
+  
+  // Filter tasks
+  const filteredTasks = tasks.filter(task => {
+    if (filters.assignee && task.assignee !== filters.assignee) return false;
+    if (filters.priority && task.priority !== filters.priority) return false;
+    if (filters.status && task.status !== filters.status) return false;
+    if (filters.tags && !task.tags?.includes(filters.tags)) return false;
+    if (filters.startDate && task.startDate < filters.startDate) return false;
+    if (filters.endDate && task.dueDate > filters.endDate) return false;
+    return true;
+  });
+  
+  // Sort tasks for List view
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    let aVal = a[sortConfig.key];
+    let bVal = b[sortConfig.key];
+    
+    // Handle dates
+    if (sortConfig.key === 'startDate' || sortConfig.key === 'dueDate') {
+      aVal = aVal ? new Date(aVal) : new Date(0);
+      bVal = bVal ? new Date(bVal) : new Date(0);
+    }
+    
+    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+  
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+  
+  const resetFilters = () => {
+    setFilters({
+      assignee: '',
+      priority: '',
+      tags: '',
+      startDate: '',
+      endDate: '',
+      status: ''
+    });
+    setSortConfig({ key: null, direction: 'asc' });
+  };
+
   const renderKanbanView = () => {
     const columns = [
-      { id: 'pending', title: 'To Do', tasks: tasks.filter(task => task.status === 'pending') },
-      { id: 'in-progress', title: 'In Progress', tasks: tasks.filter(task => task.status === 'in-progress') },
-      { id: 'completed', title: 'Completed', tasks: tasks.filter(task => task.status === 'completed') },
-      { id: 'blocked', title: 'Blocked', tasks: tasks.filter(task => task.status === 'blocked') }
+      { id: 'pending', title: 'To Do', tasks: filteredTasks.filter(task => task.status === 'pending') },
+      { id: 'in-progress', title: 'In Progress', tasks: filteredTasks.filter(task => task.status === 'in-progress') },
+      { id: 'completed', title: 'Completed', tasks: filteredTasks.filter(task => task.status === 'completed') },
+      { id: 'blocked', title: 'Blocked', tasks: filteredTasks.filter(task => task.status === 'blocked') }
     ];
 
     const handleDragStart = (e, task) => {
@@ -288,8 +353,8 @@ const Tasks = () => {
   };
 
   const renderGanttView = () => {
-    // Calculate the project timeline based on all tasks
-    const tasksWithDates = tasks.filter(t => t.startDate && t.dueDate);
+    // Calculate the project timeline based on filtered tasks
+    const tasksWithDates = filteredTasks.filter(t => t.startDate && t.dueDate);
     
     if (tasksWithDates.length === 0) {
       return (
@@ -408,29 +473,63 @@ const Tasks = () => {
   };
 
   const renderListView = () => {
+    const SortIcon = ({ columnKey }) => (
+      <span className="ml-1">
+        {sortConfig.key === columnKey ? (
+          sortConfig.direction === 'asc' ? <i className="fa fa-sort-up"></i> : <i className="fa fa-sort-down"></i>
+        ) : (
+          <i className="fa fa-sort text-gray-300"></i>
+        )}
+      </span>
+    );
+    
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Task
+                <th 
+                  scope="col" 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('title')}
+                >
+                  Task <SortIcon columnKey="title" />
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Assignee
+                <th 
+                  scope="col" 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('assignee')}
+                >
+                  Assignee <SortIcon columnKey="assignee" />
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
+                <th 
+                  scope="col" 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('status')}
+                >
+                  Status <SortIcon columnKey="status" />
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Priority
+                <th 
+                  scope="col" 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('priority')}
+                >
+                  Priority <SortIcon columnKey="priority" />
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Progress
+                <th 
+                  scope="col" 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('progress')}
+                >
+                  Progress <SortIcon columnKey="progress" />
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Due Date
+                <th 
+                  scope="col" 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('dueDate')}
+                >
+                  Due Date <SortIcon columnKey="dueDate" />
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -438,7 +537,7 @@ const Tasks = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {tasks.map((task) => (
+              {sortedTasks.map((task) => (
                 <tr key={task.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{task.title}</div>
@@ -733,6 +832,96 @@ const Tasks = () => {
     );
   };
 
+  const renderFilters = () => {
+    const hasFilters = filters.assignee || filters.priority || filters.tags || filters.startDate || filters.endDate || filters.status;
+    
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center">
+            <span className="text-sm font-medium text-gray-700 mr-2">Filters:</span>
+          </div>
+          
+          <select
+            value={filters.assignee}
+            onChange={(e) => setFilters({ ...filters, assignee: e.target.value })}
+            className="border border-gray-300 rounded-md py-1.5 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="">All Assignees</option>
+            {getUniqueAssignees().map(assignee => (
+              <option key={assignee} value={assignee}>{assignee}</option>
+            ))}
+          </select>
+          
+          <select
+            value={filters.priority}
+            onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
+            className="border border-gray-300 rounded-md py-1.5 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="">All Priorities</option>
+            {getUniquePriorities().map(priority => (
+              <option key={priority} value={priority}>{priority.charAt(0).toUpperCase() + priority.slice(1)}</option>
+            ))}
+          </select>
+          
+          <select
+            value={filters.tags}
+            onChange={(e) => setFilters({ ...filters, tags: e.target.value })}
+            className="border border-gray-300 rounded-md py-1.5 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="">All Tags</option>
+            {getUniqueTags().map(tag => (
+              <option key={tag} value={tag}>{tag}</option>
+            ))}
+          </select>
+          
+          {(activeView === 'gantt' || activeView === 'list') && (
+            <select
+              value={filters.status}
+              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+              className="border border-gray-300 rounded-md py-1.5 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="">All Statuses</option>
+              <option value="pending">To Do</option>
+              <option value="in-progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="blocked">Blocked</option>
+            </select>
+          )}
+          
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Start:</label>
+            <input
+              type="date"
+              value={filters.startDate}
+              onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+              className="border border-gray-300 rounded-md py-1.5 px-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">End:</label>
+            <input
+              type="date"
+              value={filters.endDate}
+              onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+              className="border border-gray-300 rounded-md py-1.5 px-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          
+          {hasFilters && (
+            <button
+              onClick={resetFilters}
+              className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <i className="fa fa-times mr-1"></i> Reset
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -782,6 +971,9 @@ const Tasks = () => {
           </button>
         </div>
       </div>
+
+      {/* Filters */}
+      {renderFilters()}
 
       {/* Task Views */}
       {activeView === 'kanban' && renderKanbanView()}
